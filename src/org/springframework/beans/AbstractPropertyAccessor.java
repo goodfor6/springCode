@@ -7,7 +7,7 @@ import java.util.Map;
 
 public abstract class AbstractPropertyAccessor extends PropertyEditorRegistrySupport
 implements ConfigurablePropertyAccessor{
-	
+	//测试更新
 	private boolean extractOldValueForEditor=false;
 
 	public boolean isExtractOldValueForEditor() {
