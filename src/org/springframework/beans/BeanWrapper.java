@@ -2,6 +2,9 @@ package org.springframework.beans;
 
 import java.beans.PropertyDescriptor;
 
+import org.springframework.beans.ConfigurablePropertyAccessor;
+import org.springframework.beans.InvalidPropertyException;
+
 public abstract interface BeanWrapper extends ConfigurablePropertyAccessor
 {
   public abstract Object getWrappedInstance();

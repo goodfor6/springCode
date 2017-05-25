@@ -1,5 +1,7 @@
 package org.springframework.beans;
 
+import org.springframework.beans.BeanMetadataAttribute;
+import org.springframework.beans.BeanMetadataElement;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 

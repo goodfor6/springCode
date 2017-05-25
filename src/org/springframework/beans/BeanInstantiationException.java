@@ -1,5 +1,7 @@
 package org.springframework.beans;
 
+import org.springframework.beans.FatalBeanException;
+
 @SuppressWarnings("serial")
 public class BeanInstantiationException extends FatalBeanException
 {

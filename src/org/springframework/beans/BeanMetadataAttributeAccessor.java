@@ -1,5 +1,7 @@
 package org.springframework.beans;
 
+import org.springframework.beans.BeanMetadataAttribute;
+import org.springframework.beans.BeanMetadataElement;
 import org.springframework.core.AttributeAccessorSupport;
 
 public class BeanMetadataAttributeAccessor extends AttributeAccessorSupport implements BeanMetadataElement {

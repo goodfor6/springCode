@@ -1,5 +1,6 @@
 package org.springframework.beans;
 
+import org.springframework.beans.BeansException;
 import org.springframework.core.NestedRuntimeException;
 import org.springframework.util.ObjectUtils;
 

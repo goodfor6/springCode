@@ -5,6 +5,18 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.BeansException;
+import org.springframework.beans.ConfigurablePropertyAccessor;
+import org.springframework.beans.MutablePropertyValues;
+import org.springframework.beans.NotWritablePropertyException;
+import org.springframework.beans.NullValueInNestedPathException;
+import org.springframework.beans.PropertyAccessException;
+import org.springframework.beans.PropertyBatchUpdateException;
+import org.springframework.beans.PropertyEditorRegistrySupport;
+import org.springframework.beans.PropertyValue;
+import org.springframework.beans.PropertyValues;
+import org.springframework.beans.TypeMismatchException;
+
 public abstract class AbstractPropertyAccessor extends PropertyEditorRegistrySupport
 implements ConfigurablePropertyAccessor{
 	//测试更新
