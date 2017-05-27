@@ -1,5 +1,4 @@
-﻿
-package org.springframework.beans;
+﻿package org.springframework.beans;
 
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyDescriptor;
@@ -51,6 +50,8 @@ import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
+
+
 public class BeanWrapperImpl extends AbstractPropertyAccessor
   implements BeanWrapper 
   { 
