@@ -1,11 +1,16 @@
 package org.springframework.beans;
 
+import java.beans.PropertyChangeEvent;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 
+import org.springframework.core.convert.ConversionException;
+import org.springframework.core.convert.ConverterNotFoundException;
+import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.util.Assert;
 import org.springframework.util.ReflectionUtils;
 
@@ -15,12 +20,66 @@ public class DirectFieldAccessor extends AbstractPropertyAccessor {
 	
 	private  Map<String,FieldAccessor>fieldMap=new HashMap<String,FieldAccessor>();
 	
+	public DirectFieldAccessor(final Object rootObject){
+		Assert.notNull(rootObject,"Root object must not be null ");
+	    this.rootObject=rootObject;
+	    this.typeConverterDelegate=new TypeConverterDelegate(this,rootObject);
+	    registerDefaultEditors();
+	    setExtractOldValueForEditor(true);
+	}
 	
 	public final Class<?> getRootClass() {
 		return (this.rootObject != null ? this.rootObject.getClass() : null);
 	}
 	public final Object getRootInstance() {
 		return this.rootObject;
+	}
+	@Override
+	public boolean isReadableProperty(String propertyName) throws BeansException {
+		return hasProperty(propertyName);
+	}
+
+	@Override
+	public boolean isWritableProperty(String propertyName) throws BeansException {
+		return hasProperty(propertyName);
+	}
+
+	private boolean hasProperty(String propertyPath){
+		Assert.notNull(propertyPath,"PropertyPath must not be null ");
+		return getFieldAccessor(propertyPath)!=null;
+	}
+	private FieldAccessor getFieldAccessor(String propertyPath){
+		FieldAccessor fieldAccessor=this.fieldMap.get(propertyPath);
+		if(fieldAccessor==null){
+			fieldAccessor=doGetFieldAccessor(propertyPath,getRootClass());
+			this.fieldMap.put(propertyPath, fieldAccessor);
+		}
+		return fieldAccessor;
+	}
+	
+	private FieldAccessor doGetFieldAccessor(String propertyPath,Class<?>targetClass){
+		StringTokenizer st=new StringTokenizer(propertyPath,".");
+		FieldAccessor accessor=null;
+		Class<?>parentType=targetClass;
+		while(st.hasMoreTokens()){
+			String localProperty=st.nextToken();
+			Field field =ReflectionUtils.findField(parentType, localProperty);
+			if(field==null){
+				return null;
+			}
+			if(accessor==null){
+				accessor=root(propertyPath,localProperty,field);
+			}else{
+				accessor=accessor.child(localProperty, field);
+			}
+			parentType=field.getType();
+		}
+		return accessor;
+		
+	}
+	
+	private FieldAccessor root(String canonicalName,String actualName,Field field){
+		return new FieldAccessor(null,canonicalName,actualName,field);
 	}
 	
 	//---------------------------------------------------------------------
@@ -119,5 +178,55 @@ public class DirectFieldAccessor extends AbstractPropertyAccessor {
 	}
 	
   }
+
+	@Override
+	public TypeDescriptor getPropertyTypeDescriptor(String propertyName) throws BeansException {
+		FieldAccessor fieldAccessor = getFieldAccessor(propertyName);
+		if (fieldAccessor != null) {
+			return new TypeDescriptor(fieldAccessor.getField());
+		}
+		return null;
+	}
+
+	@Override
+	public Object getPropertyValue(String propertyName) throws BeansException {
+		FieldAccessor fieldAccessor = getFieldAccessor(propertyName);
+		if (fieldAccessor == null) {
+			throw new NotReadablePropertyException(
+					getRootClass(), propertyName, "Field '" + propertyName + "' does not exist");
+		}
+		return fieldAccessor.getValue();
+	}
+
+	@Override
+	public void setPropertyValue(String propertyName, Object newValue) throws BeansException {
+		FieldAccessor fieldAccessor=getFieldAccessor(propertyName);
+		if(fieldAccessor==null){
+			throw new NotWritablePropertyException(getRootClass(),propertyName,"Field '"+propertyName+"' does not exist ");
+		}
+		Field field =fieldAccessor.getField();
+		Object oldValue=null;
+		try{
+			oldValue=fieldAccessor.getField();
+			Object convertedValue=this.typeConverterDelegate.convertIfNecessary(
+					field.getName(), oldValue,newValue,field.getType(),new TypeDescriptor(field)); 
+			fieldAccessor.setValue(convertedValue);
+		}catch (ConverterNotFoundException ex) {
+			PropertyChangeEvent pce = new PropertyChangeEvent(getRootInstance(), propertyName, oldValue, newValue);
+			throw new ConversionNotSupportedException(pce, field.getType(), ex);
+		}
+		catch (ConversionException ex) {
+			PropertyChangeEvent pce = new PropertyChangeEvent(getRootInstance(), propertyName, oldValue, newValue);
+			throw new TypeMismatchException(pce, field.getType(), ex);
+		}
+		catch (IllegalStateException ex) {
+			PropertyChangeEvent pce = new PropertyChangeEvent(getRootInstance(), propertyName, oldValue, newValue);
+			throw new ConversionNotSupportedException(pce, field.getType(), ex);
+		}
+		catch (IllegalArgumentException ex) {
+			PropertyChangeEvent pce = new PropertyChangeEvent(getRootInstance(), propertyName, oldValue, newValue);
+			throw new TypeMismatchException(pce, field.getType(), ex);
+		}
+	}
 	
 }
