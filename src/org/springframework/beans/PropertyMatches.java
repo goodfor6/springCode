@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 
 public class PropertyMatches {
@@ -26,6 +27,32 @@ public class PropertyMatches {
 	private PropertyMatches(String propertyName,Class<?>beanClass,int maxDistance){
 		this.propertyName=propertyName;
 		this.possibleMatches=calculateMatches(BeanUtils.getPropertyDescriptors(beanClass), maxDistance);
+	}
+	
+	public String buildErrorMessage(){
+		StringBuilder msg=new StringBuilder();
+		msg.append("Bean property '");
+		msg.append(this.propertyName);
+		msg.append("' is not writable or has an invalid seter method. ");
+		
+		if(ObjectUtils.isEmpty(this.possibleMatches)){
+			msg.append("Does the parameter type of the setter match the return  type of the getter? ");
+		}
+		else{
+			msg.append("Did you mean ");
+			for(int i=0;i<this.possibleMatches.length;i++){
+				msg.append('\'');
+				msg.append(this.possibleMatches[i]);
+				if(i<this.possibleMatches.length-2){
+					msg.append("',");
+				}
+				else if(i==this.possibleMatches.length-2){
+					msg.append("', or ");
+				}
+			}
+			msg.append("?");
+		}
+		return msg.toString();
 	}
 	
 	private String[] calculateMatches(PropertyDescriptor[] propertyDesciptors,int maxDistance){
