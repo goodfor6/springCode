@@ -18,6 +18,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.core.SpringProperties;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.core.io.support.SpringFactoriesLoader;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.ConcurrentReferenceHashMap;
 import org.springframework.util.StringUtils;
 
@@ -172,8 +173,43 @@ public class CachedIntrospectionResults {
 	   return false;
    }
    
+   static CachedIntrospectionResults forClass(Class<?>beanClass)throws BeansException{
+	   CachedIntrospectionResults results=strongClassCache.get(beanClass);
+	   if(results !=null){
+		   return results;
+	   }
+	   results=softClassCache.get(beanClass);
+	   if(results!=null){
+		   return results;
+	   }
+	   
+	   results=new CachedIntrospectionResults(beanClass);
+	   ConcurrentMap<Class<?>,CachedIntrospectionResults>classCacheToUse;
+	   
+	   if(ClassUtils.isCacheSafe(beanClass, CachedIntrospectionResults.class.getClassLoader())||
+			   isClassLoaderAccepted(beanClass.getClassLoader())){
+		   classCacheToUse=strongClassCache;
+	   }
+	   else{
+		   if(logger.isDebugEnabled()){
+			   logger.debug("Not Stringly caching calss ["+beanClass.getName()+
+					   "] because it is not cache -safe");
+		   }
+		   classCacheToUse=softClassCache;
+	   }
+	   CachedIntrospectionResults existing=classCacheToUse.putIfAbsent(beanClass, results);
+	   return (existing!=null?existing:results);
+   }
    
    
+   private static boolean isClassLoaderAccepted(ClassLoader classLoader){
+	   for(ClassLoader acceptedLoader: acceptedClassLoaders ){
+		   if(isUnderneathClassLoader(classLoader,acceptedLoader)){
+			   return true;
+		   }
+	   }
+	   return false;
+   }
    
    
    

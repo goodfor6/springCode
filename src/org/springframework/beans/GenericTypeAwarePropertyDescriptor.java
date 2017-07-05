@@ -99,5 +99,9 @@ final class GenericTypeAwarePropertyDescriptor extends PropertyDescriptor{
 		}
 		return this.writeMethod;
 	}
+	
+	public MethodParameter getWriteMethodParameter() {
+		return this.writeMethodParameter;
+	}
     	
 }

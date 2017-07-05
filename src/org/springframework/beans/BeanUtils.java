@@ -22,7 +22,6 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeanInstantiationException;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.CachedIntrospectionResults;
 import org.springframework.beans.FatalBeanException;
 import org.springframework.beans.GenericTypeAwarePropertyDescriptor;
 import org.springframework.core.MethodParameter;
@@ -74,11 +73,31 @@ public abstract class BeanUtils {
     	}
     }
     
-    public static <T>T instantiateClass(Class<?>clazz,Class<T>assignableTo)
+    @SuppressWarnings("unchecked")
+	public static <T>T instantiateClass(Class<?>clazz,Class<T>assignableTo)
     throws BeanInstantiationException
     {
        Assert.isAssignable(assignableTo,clazz);
        return (T) instantiateClass(clazz);
+    }
+    
+    public static <T>T instantiateClass(Constructor<T>ctor,Object args)throws BeanInstantiationException{
+    	Assert.notNull(ctor,"Constructor must not be null ");
+    	try{
+    		ReflectionUtils.makeAccessible(ctor);
+    		return ctor.newInstance(args);
+    	}catch(InstantiationException ex){
+    		throw new BeanInstantiationException(ctor.getDeclaringClass(),"Is it an abstract calssible?",ex);
+    	}
+    	catch(IllegalAccessException ex){
+    		throw new BeanInstantiationException(ctor.getDeclaringClass(),"Is the constructor accessible?",ex);
+    	}
+    	catch(IllegalArgumentException ex){
+    		throw new BeanInstantiationException(ctor.getDeclaringClass(),"Illegal arguments for constructor ",ex);
+    	}
+    	catch(InvocationTargetException ex){
+    		throw new BeanInstantiationException(ctor.getDeclaringClass(),"Constructor threw exception ",ex.getTargetException());
+    	}
     }
     
     public static <T> T instantiateClass(Constructor<T> ctor,Object [] args)

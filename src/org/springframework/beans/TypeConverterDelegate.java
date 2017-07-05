@@ -50,7 +50,7 @@ public class TypeConverterDelegate {
 	}
 	
 	public <T> T convertIfNecessary(Object newValue,Class<T>requiredType,MethodParameter methodParam)throws IllegalArgumentException{
-		return converterIfNecessary(null,null,newValue,requiredType,
+		return convertIfNecessary(null,null,newValue,requiredType,
 				(methodParam!=null?new TypeDescriptor(methodParam):TypeDescriptor.valueOf(requiredType)));
 	}
 	
@@ -63,43 +63,6 @@ public class TypeConverterDelegate {
 			String propertyName,Object oldValue,Object newValue,Class<T>requiredType)
 	 		throws IllegalArgumentException{
 		return convertIfNecessary(propertyName,oldValue,newValue,requiredType,TypeDescriptor.valueOf(requiredType));
-	}
-	
-	public <T> T convertIfNecessary(String propertyName,Object oldValue,Object newValue,
-			Class<T>requiredType,TypeDescriptor typeDescriptor)throws IllegalArgumentException{
-		Object convertedValue=newValue;
-		
-		PropertyEditor editor=this.propertyEditorRegistry.findCustomEditor(requiredType, propertyName);
-		
-		ConversionFailedException firstAttemptEx=null;
-		
-		ConversionService conversionService=this.propertyEditorRegistry.getConversionService();
-		
-		if(editor==null&&conversionService!=null&& convertedValue!=null&&typeDescriptor!=null){
-			TypeDescriptor sourceTypeDesc=TypeDescriptor.forObject(newValue);
-			TypeDescriptor targetTypeDesc=typeDescriptor;
-			if(conversionService.canConvert(sourceTypeDesc,targetTypeDesc)){
-				try{
-					return (T)conversionService.convert(convertedValue, sourceTypeDesc, targetTypeDesc);
-				}catch(ConversionFailedException ex){
-					firstAttemptEx=ex;
-				}
-			}
-		}
-		
-		if(editor!=null || (requiredType!=null&&!ClassUtils.isAssignableValue(requiredType,convertedValue))){
-			if(requiredType !=null&& Collection.class.isAssignableFrom(requiredType)&& convertedValue instanceof String){
-				TypeDescriptor elementType=typeDescriptor.getElementTypeDescriptor();
-				if(elementType!=null && Enum.class.isAssignableFrom(elementType.getType())){
-					convertedValue=StringUtils.commaDelimitedListToStringArray((String)convertedValue);
-				}
-			}
-			if(editor==null){
-				editor=findDefaultEditor(requiredType);
-			}
-			convertedValue=doConvertValue(oldValue,convertedValue,requiredType,editor);
-		}
-		
 	}
 	
 	private PropertyEditor findDefaultEditor(Class<?>requiredType){
@@ -192,7 +155,7 @@ public class TypeConverterDelegate {
 		else{
 			Object result=Array.newInstance(componentType, 1);
 			Object value=convertIfNecessary(
-					buildIndexedPropertyName(propertyName,0),null,input),componentType);
+					buildIndexedPropertyName(propertyName,0),null,input,componentType);
 			Array.set(result, 0, value);
 			return result;
 		}
@@ -203,7 +166,7 @@ public class TypeConverterDelegate {
 	}
 	
 	public <T> T convertIfNecessary(String propertyName,Object oldValue,Object newValue,
-			    Class<T> requiredType,TypeDescriptor typeDescriptor)throws IllegalArgumentExceptionP{
+			    Class<T> requiredType,TypeDescriptor typeDescriptor)throws IllegalArgumentException{
 		Object convertedValue=newValue;
 		PropertyEditor editor=this.propertyEditorRegistry.findCustomEditor(requiredType, propertyName);
 		ConversionFailedException firstAttemptEx=null;
@@ -250,7 +213,7 @@ public class TypeConverterDelegate {
 					standardConversion=true;
 				}
 				else if(convertedValue instanceof Map){
-					convertedValue=convertToTypeMap(
+					convertedValue=convertToTypedMap(
 							(Map<?,?>)convertedValue,propertyName,requiredType,typeDescriptor);
 					standardConversion=true;
 				}
@@ -323,7 +286,91 @@ public class TypeConverterDelegate {
 		return (T)convertedValue;
 	}
 	
-	private Collection<?>convertToTypeCollection(
+	private Map<?,?> convertToTypedMap(
+			Map<?, ?> original, String propertyName, Class<?> requiredType,
+			TypeDescriptor typeDescriptor) {
+		if(!Map.class.isAssignableFrom(requiredType)){
+			return original;
+		}
+		
+		boolean approximable=CollectionFactory.isApproximableMapType(requiredType);
+		if(!approximable && !canCreateCopy(requiredType)){
+			if(logger.isDebugEnabled()){
+				logger.debug("Custom Map type ["+original.getClass().getName()+
+						"] does not allow for creating a copy -injecting priginal Map as -is ");
+			}
+			return original;
+		}
+		
+		boolean originalAllowed=requiredType.isInstance(original);
+		typeDescriptor=typeDescriptor.narrow(original);
+		TypeDescriptor keyType=typeDescriptor.getMapKeyTypeDescriptor();
+		TypeDescriptor valueType=typeDescriptor.getMapValueTypeDescriptor();
+		if(keyType==null && valueType==null&& originalAllowed && 
+				!this.propertyEditorRegistry.hasCustomEditorForElement(null, propertyName)){
+			return original;
+		}
+		
+		Iterator<?>it;
+		try{
+			it=original.entrySet().iterator();
+			if(it==null){
+				if(logger.isDebugEnabled()){
+					logger.debug("Map of type ["+original.getClass().getName() +
+							"] returned null Iterator -injecting origianl Map as-is ");
+				}
+				return original;
+			}
+		}
+		catch(Throwable ex){
+			if(logger.isDebugEnabled()){
+				logger.debug("Cannot access Map of type["+original.getClass().getName()+ 
+						"] -injecting original Map as-is: "+ex);
+			}
+			return original;
+		}
+		
+		Map<Object ,Object>convertedCopy;
+		try{
+			if(approximable){
+				convertedCopy=CollectionFactory.createApproximateMap(original, original.size());
+			}else{
+				convertedCopy=(Map<Object,Object>)requiredType.newInstance();
+			}
+		}
+		catch(Throwable ex){
+			if (logger.isDebugEnabled()){
+				logger.debug("Cannot create copy of Map type ["+original.getClass().getName()+
+						"] -injecting original Map as-is:"+ex);
+			}
+			return original;
+		}
+		
+		while(it.hasNext()){
+			Map.Entry<?,?>entry=(Map.Entry<?,?>)it.next();
+			Object key=entry.getKey();
+			Object value=entry.getValue();
+			String keyedPropertyName=buildKeyedPropertyName(propertyName,key);
+			Object convertedKey=convertIfNecessary(keyedPropertyName,null,key,
+					(keyType!=null?keyType.getType():null),keyType);
+			Object convertedValue=convertIfNecessary(keyedPropertyName,null,value,
+					(valueType!=null?valueType.getType():null),valueType);
+			try{
+				convertedCopy.put(convertedKey,convertedValue);
+			}
+			catch(Throwable ex){
+				if(logger.isDebugEnabled()){
+					logger.debug("Map type ["+original.getClass().getName()+
+							"] seems to be read-only -injecting original Map as -is "+ex);
+				}
+				return original;
+			}
+			originalAllowed=originalAllowed && (key==convertedKey)&&(value==convertedValue);
+		}
+		return (originalAllowed?original:convertedCopy);
+	}
+
+	private Collection<?>convertToTypedCollection(
 			Collection<?>original,String propertyName,Class<?>requiredType,TypeDescriptor typeDescriptor){
 		if(!Collection.class.isAssignableFrom(requiredType)){
 			return original;
@@ -438,4 +485,10 @@ public class TypeConverterDelegate {
 		}
 		return convertedValue;
 	}
+	
+	private String buildKeyedPropertyName(String propertyName,Object key){
+		return (propertyName!=null?
+				propertyName+PropertyAccessor.PROPERTY_KEY_PREFIX +key+PropertyAccessor.PROPERTY_KEY_SUFFIX:null);
+	}
+	
 }
