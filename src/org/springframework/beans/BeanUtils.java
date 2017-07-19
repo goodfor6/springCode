@@ -1,7 +1,6 @@
 package org.springframework.beans;
 
-import java.awt.List;
-import java.beans.PropertyDescriptor;
+simport java.beans.PropertyDescriptor;
 import java.beans.PropertyEditor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
