@@ -1,11 +1,18 @@
 package org.springframework.core.util;
 
 import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+
+import org.springframework.cglib.proxy.Proxy;
+import org.springframework.util.Assert;
+import org.springframework.util.ReflectionUtils;
 
 public abstract class ClassUtils {
 
@@ -251,6 +258,207 @@ public abstract class ClassUtils {
 		else{
 			return clazz.getName();
 		}
+	}
+	
+	public static String getDescriptiveType(Object value){
+		if(value == null ){
+			return null;
+		}
+		
+		Class<?> clazz = value.getClass();
+		if(Proxy.isProxyClass(clazz)){
+			StringBuilder result = new StringBuilder(clazz.getName());
+			result.append(" implmenting ");
+			Class<?>[] ifcs = clazz.getInterfaces();
+			for (int i=0 ;i<ifcs.length;i++){
+				result.append(ifcs[i].getName());
+				if(i< ifcs.length - 1){
+					result.append(',');
+				}
+			}
+			return result.toString();
+		}
+		else if (clazz.isArray()){
+			return getQualifiedNameForArray(clazz);
+		}
+		else{
+			return clazz.getName();
+		}
+	}
+	
+	public static boolean matchesTypeName(Class<?>clazz,String typeName){
+		return ( typeName != null && 
+				( typeName.equals(clazz.getName()) || typeName.equals(clazz.getSimpleName()) ||
+						(clazz.isArray() && typeName.equals(getQualifiedNameForArray(clazz)))));
+	}
+	public static boolean hasConstructor(Class <?> clazz,Class<?>... paramTypes){
+		return (getConstructorIfAvailable(clazz,paramTypes)!= null);
+	}
+	
+	public static <T> Constructor<T> getConstructorIfAvailable(Class<T> clazz,Class<?>... paramTypes){
+		Assert.notNull(clazz," Class must not be null ");
+		try{
+			return clazz.getConstructor(paramTypes);
+		}
+		catch(NoSuchMethodException ex){
+			return null;
+		}
+	}
+	
+	public static boolean hasMethod(Class<?>clazz,String methodName,Class<?>... paramTypes){
+		return (getMethodIfAvailable(clazz,methodName,paramTypes)!=null);
+	}
+	
+	public static Method getMethod(Class<?>clazz,String methodName,Class<?>... paramTypes){
+		Assert.notNull(clazz,"Class must not be null ");
+		Assert.notNull(methodName,"Method name must not be null ");
+		if(paramTypes != null){
+			try{
+				return clazz.getMethod(methodName, paramTypes);
+			}
+			catch(NoSuchMethodException ex){
+				throw new IllegalStateException("Expected method not found : "+ ex);
+			}
+		}
+		else {
+			Set<Method>candidates = new HashSet<Method>(1);
+			Method[] methods = clazz.getMethods();
+			for (Method method : methods){
+				if(methodName.equals(method.getName())){
+					candidates.add(method);
+				}
+			}
+			if(candidates.size() == 1){
+				return candidates.iterator().next();
+			}
+			else if(candidates.isEmpty()){
+				throw new IllegalStateException("Expected method not found : "+clazz+"."+methodName);
+			}
+			else{
+				throw new IllegalStateException("No unique method found:"+clazz+"."+methodName);
+			}
+		}
+	}
+	
+	public static Method getMethodIfAvailable(Class<?>clazz,String methodName,Class<?>...paramTypes){
+		Assert.notNull(clazz,"Class must not be null ");
+		Assert.notNull(methodName,"Method name must not be null");
+		if(paramTypes != null){
+			try{
+				return clazz.getMethod(methodName, paramTypes);
+			}
+			catch(NoSuchMethodException ex){
+				return null;
+			}
+		}
+		else{
+			Set<Method>candidates = new HashSet<Method>(1);
+			Method[] methods = clazz.getMethods();
+			for(Method method : methods){
+				if(methodName.equals(method.getName())){
+					candidates.add(method);
+				}
+			}
+			if(candidates.size() == 1){
+				return candidates.iterator().next();
+			}
+			return null;
+		}
+	}
+	 
+	
+	public static int getMethodCountForName(Class<?>clazz,String methodName){
+		Assert.notNull(clazz," Class must not be null ");
+		Assert.notNull(methodName," Method bame must not be null ");
+		int count = 0;
+		Method[] declaredMethods = clazz.getDeclaredMethods();
+		for(Method method : declaredMethods){
+			if(methodName.equals(method.getName())){
+				count++;
+			}
+		}
+		Class<?>[] ifcs = clazz.getInterfaces();
+		for(Class<?> ifc : ifcs){
+			count += getMethodCountForName(ifc,methodName);
+		}
+		if(clazz.getSuperclass() != null){
+			count += getMethodCountForName(clazz.getSuperclass(),methodName);
+		}
+		return count;
+	}
+	
+	
+	public static boolean hasAtLeastOneMethodWithName(Class<?> clazz,String methodName){
+		Assert.notNull(clazz, "Class must not be null");
+		Assert.notNull(methodName, "Method name must not be null");
+		Method[] declaredMethods = clazz.getDeclaredMethods();
+		for (Method method : declaredMethods) {
+			if (method.getName().equals(methodName)) {
+				return true;
+			}
+		}
+		Class<?>[] ifcs = clazz.getInterfaces();
+		for (Class<?> ifc : ifcs){
+			if(hasAtLeastOneMethodWithName(ifc,methodName)){
+				return true;
+			}
+		}
+		return (clazz.getSuperclass()!= null && hasAtLeastOneMethodWithName(clazz.getSuperclass(),methodName));
+	}
+	
+	public static Method getMostSpecificMethod(Method method,Class<?> targetClass){
+		if(method != null && isOverridable(method,targetClass) &&
+				targetClass != null && !targetClass.equals(method.getDeclaringClass())){
+			try{
+				if(Modifier.isPublic(method.getModifiers())){
+					try{
+						return targetClass.getMethod(method.getName(), method.getParameterTypes());
+					}
+					catch(NoSuchMethodException ex){
+						return method;
+					}
+				}
+				else{
+					Method specificMethod =
+							ReflectionUtils.findMethod(targetClass, method.getName(),method.getParameterTypes());
+					return (specificMethod != null ? specificMethod : method);
+				}
+			}
+			catch(SecurityException ex){
+				
+			}
+		}
+		return method;
+	}
+	
+	public static boolean isUserLevelMethod(Method method){
+		Assert.notNull(method,"Method must not be null");
+		return (method.isBridge() || (!method.isSynthetic() && !isGroovyObjectMethod(method)));
+	}
+	
+	public static boolean isGroovyObjectMethod(Method method){
+		return method.getDeclaringClass().getName().equals("groovy.lang.GroovyObject");
+	}
+	
+	private static boolean isOverridable(Method method,Class<?>targetClass){
+		if(Modifier.isPrivate(method.getModifiers())){
+			return false;
+		}
+		if(Modifier.isPublic(method.getModifiers()) || Modifier.isProtected(method.getModifiers())){
+			return true;
+		}
+		return getPackageName(method.getDeclaringClass()).equals(getPackageName(targetClass));
+	}
+	
+	public static String getPackageName(Class<?> clazz) {
+		Assert.notNull(clazz, "Class must not be null");
+		return getPackageName(clazz.getName());
+	}
+	
+	public static String getPackageName(String fqClassName){
+		Assert.notNull(fqClassName,"Class name must not be null ");
+		int lastDotIndex = fqClassName.lastIndexOf(PACKAGE_SEPARATOR);
+		return (lastDotIndex != -1 ? fqClassName.substring(0,lastDotIndex): "");
 	}
 	
 	private static String getQualifiedNameForArray(Class<?>clazz){
