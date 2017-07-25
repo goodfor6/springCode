@@ -5,13 +5,18 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
 import org.springframework.cglib.proxy.Proxy;
 import org.springframework.util.Assert;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.ReflectionUtils;
 
 public abstract class ClassUtils {
@@ -450,9 +455,216 @@ public abstract class ClassUtils {
 		return getPackageName(method.getDeclaringClass()).equals(getPackageName(targetClass));
 	}
 	
+	public static Method getStaticMethod(Class<?>clazz,String methodName,Class<?>... args){
+		Assert.notNull(clazz,"Class must not be null ");
+		Assert.notNull(methodName,"Method name must not be null ");
+		try{
+			Method method = clazz.getMethod(methodName, args);
+			return Modifier.isStatic(method.getModifiers())? method : null;
+		}
+		catch(NoSuchMethodException ex){
+			return null;
+		}
+	}
+	
+	public static boolean isPrimitiveWrapper(Class<?> clazz){
+		Assert.notNull(clazz,"Class must not be null ");
+		return primitiveWrapperTypeMap.containsKey(clazz);
+	}
+	
+	public static boolean isPrimitiveOrWrapper(Class<?> clazz){
+		Assert.notNull(clazz,"Class must not be null");
+		return (clazz.isPrimitive() || isPrimitiveWrapper(clazz));
+	}
+	
+	public static boolean isPritiveArray(Class<?>clazz){
+		Assert.notNull(clazz,"Class must not be null ");
+		return (clazz.isArray() && clazz.getComponentType().isPrimitive());
+	}
+	
+	public static boolean isPritiveWrapperArray(Class<?> clazz){
+		Assert.notNull(clazz,"Class must not be null ");
+		return (clazz.isArray() && isPrimitiveWrapper(clazz.getComponentType()));
+	}
+	
+	public static Class<?> resolvePrimitiveIfNecessary(Class<?> clazz){
+		Assert.notNull(clazz,"Class must not be null ");
+		return (clazz.isPrimitive() && clazz != void.class ? primitiveTypeToWrapperMap.get(clazz): clazz);
+	}
+	
+	public static boolean isAssignable(Class<?> lhsType,Class<?>rhsType){
+		Assert.notNull(lhsType,"Lefg-hand side type must not be null ");
+		Assert.notNull(rhsType,"Right-hand siede type must not be null ");
+		if(lhsType.isAssignableFrom(rhsType)){
+			return true;
+		}
+		if(lhsType.isPrimitive()){
+			Class<?> resolvedPrimitive = primitiveWrapperTypeMap.get(rhsType);
+			if( resolvedPrimitive != null && lhsType.equals(resolvedPrimitive)){
+				return true;
+			}
+		}
+		else {
+			Class<?> resolvedWrapper = primitiveTypeToWrapperMap.get(rhsType);
+			if(resolvedWrapper != null && lhsType.isAssignableFrom(resolvedWrapper)){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public static boolean isAssignableValue(Class<?>type,Object value){
+		Assert.notNull(type,"Type must not be null ");
+		return (value != null ? isAssignable(type,value.getClass()):!type.isPrimitive());
+	}
+	
+	public static String convertResourcePathToClassName(String resourcePath){
+		Assert.notNull(resourcePath," Resource path must not be null ");
+		return resourcePath.replace(PACKAGE_SEPARATOR, PACKAGE_SEPARATOR);
+	}
+	
+	public static String convertClassNameToResourcepath(String className){
+		Assert.notNull(className,"Class name must not be null ");
+		return className.replace(PACKAGE_SEPARATOR, PATH_SEPARATOR);
+	}
+	
+	public static String addResourcePathToPackagePath(Class <?> clazz,String resourceName){
+		Assert.notNull(resourceName,"Resource name must not be null");
+		if(!resourceName.startsWith("/")){
+			return classPackageAsResourcePath(clazz)+"/"+resourceName;
+		}
+		return classPackageAsResourcePath(clazz) + resourceName;
+	}
+	
+	
 	public static String getPackageName(Class<?> clazz) {
 		Assert.notNull(clazz, "Class must not be null");
 		return getPackageName(clazz.getName());
+	}
+	
+	public static String classPackageAsResourcePath(Class<?>clazz){
+		if(clazz == null ){
+			return "";
+		}
+		String className = clazz.getName();
+		int packageEndIndex = className.lastIndexOf(PACKAGE_SEPARATOR);
+		if(packageEndIndex == -1){
+			return "";
+		}
+		String packageName = className.substring(0,packageEndIndex);
+		return packageName.replace(PACKAGE_SEPARATOR, PATH_SEPARATOR);
+	}
+	
+	public static String classNamesToString (Class<?>...classes ){
+		return classNamesToString(Arrays.asList(classes));
+	}
+	
+	public static String classNamesToString(Collection<Class<?>>classes){
+		if(CollectionUtils.isEmpty(classes)){
+			return "[]";
+		}
+		StringBuilder sb = new StringBuilder("[");
+		for(Iterator<Class<?>>it = classes.iterator();it.hasNext();){
+			Class<?>clazz=it.next();
+			sb.append(clazz.getName());
+			if(it.hasNext()){
+				sb.append(", ");
+			}
+		}
+		sb.append("]");
+		return sb.toString();
+	}
+	
+	public static Class<?>[] toClassArray(Collection<Class<?>> collection){
+		if(collection == null){
+			return null;
+		}
+		return collection.toArray(new Class<?>[collection.size()]);
+	}
+	
+	public static Class<?>[]getAllInterfaces(Object instance){
+		Assert.notNull(instance,"Instance must not be null");
+		return getAllInterfacesForClass(instance.getClass());
+	}
+	
+	public static Class<?>[] getAllInterfacesForClass(Class<?>clazz){
+		return getAllInterfacesForClass(clazz,null);
+	}
+	
+	public static Class<?>[] getAllInterfacesForClass(Class<?>clazz,ClassLoader classLoader){
+		Set<Class<?>>ifcs = getAllInterfacesForClassAsSet(clazz,classLoader);
+		return ifcs.toArray(new Class<?>[ifcs.size()]);
+	}
+	
+	public static Set<Class<?>>getAllInterfacesForClassAsSet(Class<?> clazz,ClassLoader classLoader){
+		Assert.notNull(clazz,"Class must not be null ");
+		if(clazz.isInterface() && isVisible(clazz,classLoader)){
+			return Collections.<Class<?>>singleton(clazz);
+		}
+		Set<Class<?>>interfaces = new LinkedHashSet<Class<?>>();
+		while (clazz != null){
+			Class<?> [] ifcs = clazz.getInterfaces();
+			for( Class<?> ifc : ifcs){
+				interfaces.addAll(getAllInterfacesForClassAsSet(ifc,classLoader));
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return interfaces;
+	}
+	
+	public static Class<?> createCompositeInterface(Class<?>[] interfaces,ClassLoader classLoader){
+		Assert.notEmpty(interfaces,"Interfaces must not be empty");
+		Assert.notNull(classLoader,"ClassLoader must not be null ");
+		return Proxy.getProxyClass(classLoader, interfaces);
+	}
+	
+	public static Class<?>determineCommonAncestor(Class<?>clazz1,Class<?>clazz2){
+		if(clazz1 == null){
+			return clazz2;
+		}
+		if(clazz2 == null){
+			return clazz1;
+		}
+		if(clazz1.isAssignableFrom(clazz2)){
+			return clazz1;
+		}
+		if(clazz2.isAssignableFrom(clazz1)){
+			return clazz2;
+		}
+		Class<?> ancestor = clazz1;
+		do{
+			ancestor = ancestor.getSuperclass();
+			if(ancestor == null || Object.class.equals(ancestor)){
+				return null;
+			}
+		}
+		while(!ancestor.isAssignableFrom(clazz2));
+		return ancestor;
+	}
+	
+	public static boolean isVisible(Class<?>clazz,ClassLoader classLoader){
+		if(classLoader == null){
+			return true;
+		}
+		try{
+			Class<?> actualClass = classLoader.loadClass(clazz.getName());
+			return (clazz == actualClass);
+		}
+		catch(ClassNotFoundException ex){
+			return false;
+		}
+	}
+	
+	public static boolean isCglibProxy(Object object){
+		return ClassUtils.isCglibProxy(object.getClass());
+	}
+	
+	public static boolean isCglibProxyClass(Class<?>clazz){
+		return (clazz != null && isCglibProxyClassName(clazz.getName()));
+	}
+	
+	public static boolean isCglibProxyClassName(String className){
+		return (className != null && className.contains(CGLIB_CLASS_SEPARATOR));
 	}
 	
 	public static String getPackageName(String fqClassName){
