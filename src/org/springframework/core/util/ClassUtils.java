@@ -206,7 +206,7 @@ public abstract class ClassUtils {
 	}
 	
 	public static Class<?> getUserClass(Class<?>clazz){
-		if(clazz != null && clazz.getName().contains(CGLIB_CLASS_SEPARATOR)){
+		if(clazz != null && clazz.getName().contains(CGLIB_CLASS_SEPARATOR)){////
 			Class<?> superClass = clazz.getSuperclass();
 			if(superClass != null && !Object.class.equals(superClass)){
 				return superClass;
