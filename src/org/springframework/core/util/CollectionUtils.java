@@ -59,7 +59,7 @@ public abstract class CollectionUtils {
 				Object candidate = iterator.next();
 				if (ObjectUtils.nullSafeEquals(candidate, element)){
 					return true;
-				}
+				}//
 			}
 		} 
 		return false;     
