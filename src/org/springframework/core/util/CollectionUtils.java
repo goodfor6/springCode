@@ -77,5 +77,27 @@ public abstract class CollectionUtils {
 		return false;
 	}
 	
+	public static boolean containsInstance(Collection <?> collection, Object element){
+		if(collection != null ){
+			for(Object candidate : collection){
+				if( candidate == element){
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	public static boolean containsAny(Collection<?>source, Collection<?>candidates){
+		if(isEmpty(source) || isEmpty(candidates)){
+			return false;
+		}
+		for(Object candidate : candidates){
+			if(source.contains(candidate)){
+				return true;
+			}
+		}
+		return false;
+	}
 
 }
