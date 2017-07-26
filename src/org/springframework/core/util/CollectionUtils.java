@@ -1,7 +1,9 @@
 package org.springframework.core.util;
 
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.ObjectUtils;
 
+import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.Iterator;
@@ -100,7 +102,7 @@ public abstract class CollectionUtils {
 		if(isEmpty(source) || isEmpty(candidates)){
 			return null;
 		}
-		for( Object candidate : cnadidates){
+		for( Object candidate : candidates){
 			if(source.contains(candidate)){
 				return (E)candidate;
 			}
@@ -116,7 +118,7 @@ public abstract class CollectionUtils {
 		for(Object element : collection){
 			if(type == null || type.isInstance(element)){
 				if(value != null){
-					reutrn null;
+					return null;
 				}
 				value = (T) element;
 			}
@@ -125,7 +127,7 @@ public abstract class CollectionUtils {
 	}
 
 	public static Object findValueOfTyppe(Collection<?> collection, Class<?>[] types){
-		if(isEmpty(collection) || Object.isEmpty(types)){
+		if(isEmpty(collection) /*|| Object.isEmpty(types)*/){
 			return null;
 		}
 		for(Class<?> type : types ){
@@ -143,7 +145,7 @@ public abstract class CollectionUtils {
 		}
 		boolean hasCandidate = false;
 		Object candidate = false ;
-		for(Object element : colllection){
+		for(Object element : collection){
 			if(!hasCandidate){
 				hasCandidate = true;
 				candidate = element;
@@ -175,24 +177,47 @@ public abstract class CollectionUtils {
 
 	 public static <A,E extends A> A[] toArray(Enumeration<E> enumeration,A[] array){
 	 	ArrayList<A> elements = new ArrayList<A>();
-	 	whild (enumeration.hasMoreElements()){
+	 	while (enumeration.hasMoreElements()){
 	 		elements.add(enumeration.nextElement());
 		 }
 		 return elements.toArray(array);
 	 }
-
-	 public static <E>Itertor<E> toIterator(Enumerator<E>enumeration){
+	 public static <E>Iterator<E> toIterator(Enumeration<E>enumeration){
 	 	return new EnumerationIterator<E>(enumeration);
 	 }
+	 
+	 private static class EnumerationIterator<E> implements Iterator<E>{
+		 
+		 private Enumeration<E> enumeration;
+		 
+		 public EnumerationIterator(Enumeration<E>enumeration){
+			 this.enumeration = enumeration;
+		 }
+		 
+		 public boolean hasNext(){
+			 return this.enumeration.hasMoreElements();
+		 }
+		 
+		 public E next(){
+			 return this.enumeration.nextElement();
+		 }
+		 
+		 public void remove() throws UnsupportedOperationException{
+			 throw new UnsupportedOperationException(" Not supported ");
+		 }
+	 }
+	 
+	 
 
-	 public static <K,V> MultiValueMap<K,V>toMultiValueMap(Map<K,List<V>> map){
-	 	return new CollectionUtils.MultiVlaueMapAdapter(map);
+	public static <K,V> MultiValueMap<K,V>toMultiValueMap(Map<K,List<V>> map){
+	 	return new MultiValueMapAdapter(map);
 	 }
 
-	 public static <K,V>MultiValueMap<K,V> unmodifiableMultiValueMap(MultiValueMap<? extends K,? extends V> map){
+	 @SuppressWarnings({ "rawtypes", "unchecked" })
+	public static <K,V>MultiValueMap<K,V> unmodifiableMultiValueMap(MultiValueMap<? extends K,? extends V> map){
 	 	Assert.notNull(map,"'map' must not be null");
 	 	Map<K,List<V>> result = new LinkedHashMap(map.size());
-		Iterator var2 = map.entrySet().iterator;
+		Iterator var2 = map.entrySet().iterator();
 
 		while (var2.hasNext()){
 			Entry<? extends K,? extends List<? extends V>> entry = (Entry)var2.next();
@@ -204,14 +229,16 @@ public abstract class CollectionUtils {
 		return toMultiValueMap(unmodifiableMap);
 	 }
 
-	 private static class MultiValueMapAdapter<K,V> implements MultiValueMap<K,V> ,Serializeable{
+	private static class MultiValueMapAdapter<K,V> implements MultiValueMap<K,V> ,Serializable{
 	 	private final Map<K,List<V>> map ;
 	    public MultiValueMapAdapter(Map<K,List<V>> map){
 			Assert.notNull(map,"'map' must not be null");
 	    	this.map = map;
 		}
+		@SuppressWarnings("rawtypes")
 		public void add(K key,V value){
-	    	List<V> values = (List)this.map.get(key);
+	    	@SuppressWarnings("rawtypes")
+			List<V> values = (List)this.map.get(key);
 	    	if(values == null){
 	    		values = new LinkedList();
 				this.map.put(key,values);
@@ -230,24 +257,25 @@ public abstract class CollectionUtils {
 			this.map.put(key,values);
 		}
 
+		@SuppressWarnings("rawtypes")
 		public void setAll(Map<K,V> values){
 			Iterator var2 = values.entrySet().iterator();
 
 			while(var2.hasNext()){
 				Entry<K,V> entry = (Entry)var2.next();
-				this.set(entry.getKey(),entry.getValue );
+				this.set(entry.getKey(),entry.getValue() );
 			}
 		}
 
 		public Map<K,V> toSingleValueMap(){
-			LinkedHashMap<K,V> singleVlaueMap = new LInkedHashMap(this.map.size());
+			LinkedHashMap<K,V> singleVlaueMap = new LinkedHashMap(this.map.size());
 			Iterator var2 = this.map.entrySet().iterator();
 
 			while(var2.hasNext()){
 				Entry<K,List<V>>entry = (Entry)var2.next();
-				singelValueMap.put(entry.getKey(),((List)entry.getValue()).get(0));
+				singleVlaueMap.put(entry.getKey(),(V)((List)entry.getValue()).get(0));
 			}
-			return singleValueMap;
+			return singleVlaueMap;
 		}
 
 		public int size() { return this.map.size();}
@@ -256,7 +284,7 @@ public abstract class CollectionUtils {
 
 		public boolean containsKey(Object key){return this.map.containsKey(key);}
 
-		public boolean containsValue(Object value){ reutrn  this.map.containsValue(value);}
+		public boolean containsValue(Object value){ return  this.map.containsValue(value);}
 
 		public List<V> get(Object key){ return (List)this.map.get(key);}
 
@@ -264,7 +292,7 @@ public abstract class CollectionUtils {
 
 		public List<V> remove(Object key){ return (List)this.map.remove(key);}
 
-		public void putAll(Map<? extends K,? extends List<V> >m){ return this.map.putAll(m);}
+		public void putAll(Map<? extends K,? extends List<V> >m){  this.map.putAll(m);}
 
 		public void clear() {this.map.clear();}
 
