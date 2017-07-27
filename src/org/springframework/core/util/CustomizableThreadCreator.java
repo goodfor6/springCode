@@ -1,6 +1,7 @@
 package org.springframework.core.util;
 
 
+import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -27,7 +28,7 @@ public class CustomizableThreadCreator implements Serializable {
 
     public void setThreadPriority(int threadPriority){ this.threadPriority = threadPriority;}
 
-    public int getThreadPrioirty(){reurn this.threadPriority;}
+    public int getThreadPriority(){return this.threadPriority;}
 
     public void setDaemon(boolean daemon){this.daemon = daemon;}
 
@@ -41,16 +42,16 @@ public class CustomizableThreadCreator implements Serializable {
 
     public ThreadGroup getThreadGroup(){return this.threadGroup;}
 
-    public Thread createThread(Runnable runnable){
-        Thread thread = new Thread(getThreadGroup(),runnable,nextThreadName());
-        thread.setPriority(getThreadPriority());
-        thread.setDaemon(isDaemom());
-        reurn thread;
-        }
+	public Thread createThread(Runnable runnable) {
+		Thread thread = new Thread(getThreadGroup(), runnable, nextThreadName());
+		thread.setPriority(getThreadPriority());
+		thread.setDaemon(isDaemon());
+		return thread;
+	}
 
      protected String nextThreadName(){return getThreadNamePrefix()+this.threadCount.incrementAndGet();}
 
-     protected String getDefaultThreadNamePrefix(){ return ClassUtils.getsShortName(getClass())+"-";}
+     protected String getDefaultThreadNamePrefix(){ return ClassUtils.getShortName(getClass())+"-";}
 
 
 }
