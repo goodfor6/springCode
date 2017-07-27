@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Created by Administrator on 2017/7/27.
  */
+@SuppressWarnings("serial")
 public class CustomizableThreadCreator implements Serializable {
     private String threadNamePrefix;
     private int threadPriority = 5;
