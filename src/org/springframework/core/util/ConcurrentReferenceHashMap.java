@@ -4,7 +4,9 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Array;
 import java.util.AbstractMap;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -133,11 +135,11 @@ public class ConcurrentReferenceHashMap<K,V>extends AbstractMap<K,V> implements 
 	}
 	
 	private V put(final K key,final V value,final boolean overwriteExisting){
-		return doTask(key,new Task<V>(TaskOption.RESTRUCTURE_BEFORE,TaskOption.RESIZE)){
+		return doTask(key,new Task<V>(TaskOption.RESTRUCTURE_BEFORE,TaskOption.RESIZE){
 			protected V execute(Reference<k,V>reference,Entry<K,V>entry,Entries entries){
 				if(entry != null){
 					V previousValue = entry.getValue();
-					if(overwriteexisting){
+					if(overwriteExisting){
 						entry.setValue(value);
 					}
 					return previousValue;
@@ -151,6 +153,76 @@ public class ConcurrentReferenceHashMap<K,V>extends AbstractMap<K,V> implements 
 		int hash = getHash(key);
 		return getSegmentForHash(hash).doTask(hash,key,task);
 	}
+	
+	public boolean remove(Object key,final Object value){
+		return doTask(key,new Task<Boolean>(TaskOption.RESTRUCTURE_AFTER,TaskOption.SKIP_IF_EMPTY){
+			protected Boolean execute(Reference<K,V> reference,Entry<K,V> entry){
+				if(entry != null && ObjectUtils.nullSafeEquals(entry.getValue(), value)){
+					reference.release();
+					return true;
+				}
+				return false;
+			}
+		});
+	} 
+	
+	public boolean replace(K key,final V oldValue,final V newValue){
+		return doTask(key,new Task<Boolean>(TaskOption.RESTRUCTURE_BEFORE,TaskOption.SKIP_IF_EMPTY){
+			protected Boolean execute(Reference<K,V> reference,Entry<K,V>entry){
+				if(entry != null && ObjectUtils.nullSafeEquals(entry.getValue(), oldValue)){
+					entry.setValue(newValue);
+					return true;
+				}
+				return false;
+			}
+		});
+	}
+	
+	public V replace(K key,final V value){
+		return doTask(key,new Task<V>(TaskOption.RESTRUCTURE_BEFORE,TaskOption.SKIP_IF_EMPTY){
+			protected V execute(Reference<K,V>reference,Entry<K,V>entry){
+				if(entry != null){
+					V previousValue = entry.getValue();
+					entry.setValue(value);
+					return previousValue;
+				}
+				return null;
+			}
+		});
+	}
+	
+	public void clear(){
+		for(Segment segment : this.segments){
+			segment.clear();
+		}
+	}
+	
+	public void purgeUnreferenceEntries(){
+		for(Segment segment : this.segments){
+			segment.restructureIfNecessary(false);
+		}
+	}
+	
+	public int size(){
+		int size = 0;
+		for(Segment segment : this.segments){
+			size += segment.getCount();
+		}
+		return size;
+	}
+	
+	public Set<java.util.Map.Entry<K,V>>entrySet(){
+		if(this.entrySet == null){
+			this.entrySet = new EntrySet();
+		}
+		return this.entrySet();
+	}
+	
+	private <T> T doTask(Object key,Task<T> task){
+		int hash = getHash(key);
+		return getSegmentForHash(hash).doTask(hash,key,task);
+	}
+	
 	
 	private abstract class Task<T>{
 		private final EnumSet<TaskOption>options;
@@ -235,7 +307,6 @@ public class ConcurrentReferenceHashMap<K,V>extends AbstractMap<K,V> implements 
         }
         
         public Reference<K, V> getReference(Object key, int hash, Restructure restructure) {
-			// TODO Auto-generated method stub
 			return null;
 		}
 
@@ -248,9 +319,9 @@ public class ConcurrentReferenceHashMap<K,V>extends AbstractMap<K,V> implements 
         	this.resizeThreshold = (int)(references.length*getLoadFactor());
         }
         
-        public <T>doTask(final int hash,final Object key,final Task<T>task){
+        public <T>doTask(final int hash,final Object key,final Task <T> task){
         	boolean resize = task.hasOption(TaskOption.RESIZE);
-        	if(task.hasOption(TaskOption.RESIZE))){
+        	if(task.hasOption(TaskOption.RESIZE)){
         		restructureIfNecessary(resize);
         	}
         	if(task.hasOption(TaskOption.SKIP_IF_EMPTY)&& this.count == 0){
@@ -275,12 +346,108 @@ public class ConcurrentReferenceHashMap<K,V>extends AbstractMap<K,V> implements 
         	finally{
         		unlock();
         		if(task.hasOption(TaskOption.RESTRUCTURE_AFTER)){
-        			restructrueIfNecessary(resize);
+        			restructureIfNecessary(resize);
         		}
         	}
-        	
-        	
         }
+        
+        private Reference<K,V>findInChain(Reference<K,V> reference,Object key,int hash){
+        	while (reference != null){
+        		if(reference.getHash() == hash){
+        			Entry<K,V> entry = reference.get();
+        			if(entry != null){
+        				K entryKey = entry.getKey();
+        				if(entryKey == key || entryKey.equals(key)){
+        					return reference;
+        				}
+        			}
+        		}
+        		reference = reference.getNext();
+        	}
+        	return null;
+        }
+        
+        public void clear(){
+        	if(this.count == 0){
+        		return;
+        	}
+        	lock();
+        	try{
+        		setReferences(createReferenceArray(this.initialSize));
+        		this.count = 0;
+        	}
+        	finally{
+        		unlock();
+        	}
+        }
+        
+        protected final void restructureIfNecessary(boolean allowResize){
+        	boolean needsResize = ((this.count > 0) && (this.count >= this.resizeThreshold));
+        	Reference<K,V> reference = this.referenceManager.pollForPurge();
+        	if((reference != null) || (needsResize && allowResize)){
+        		lock();
+        		try{
+        			int countAfterRestructure = this.count;
+        			Set<Reference<K,V>> toPurge = Collections.emptySet();
+        			if(reference != null){
+        				toPurge = new HashSet<Reference<K,V>>();
+        				while(reference != null){
+        					toPurge.add(reference);
+        					reference = this.referenceManager.pollForPurge();
+        				}
+        			}
+        			countAfterRestructure -=toPurge.size();
+        			needsResize = (countAfterRestructure > 0 && countAfterRestructure >= this.resizeThreshold);
+        			boolean resizing = false;
+        			int restructureSize = this.references.length;
+        			if(allowResize && needsResize && restructureSize < MAXIMUM_SEGMENT_SIZE){
+        				restructureSize <<= 1;
+        				resizing = true;
+        			}
+        			                                            
+        			Reference<K,V>[] restructured = (resizing ? createReferenceArray(restructureSize): this.references); 
+        			for( int i = 0; i< this.references.length; i++){
+        				reference = this.references[i];
+        				if(!resizing){
+        					restructured[i] = null;
+        				}
+        				while(reference != null){
+        					if(!toPurge.contains(reference) && (reference.get()!=null)){
+        						int index = getIndex(reference.getHash(),restructured);
+        						restructured[index] = this.referenceManager.createReference(
+        								reference.get(), reference.getHash(),restructured[index]); 
+        					}
+        					reference = reference.getNext();
+        				}
+        			}
+        			if(resizing){
+        				setReferences(restructured);
+        			}
+        			this.count = Math.max(countAfterRestructure, 0);
+        			
+        		}finally{
+        			unlock();
+        		}
+        	}
+        }
+       
+        public final int getSize(){
+        	return this.references.length;
+        }
+        
+        public final int getCount(){
+        	return this.count;
+        }
+        
+    }
+    
+    @SuppressWarnings("unchecked")
+	private Reference<K,V>[]createReferenceArray(int size){
+    	return (Reference<K,V>[])Array.newInstance(Reference.class,size);
+    }
+    
+    private int getIndex(int hash,Reference<K,V>[] references){
+    	return (hash & (references.length - 1));
     }
 
     protected static interface Reference<K,V>{
