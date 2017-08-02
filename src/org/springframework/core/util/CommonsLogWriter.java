@@ -1,13 +1,13 @@
 package org.springframework.core.util;
 
-import org.apache.commons.logging.Log;
-
 import java.io.Writer;
+
+import org.apache.commons.logging.Log;
 
 /**
  * Created by Administrator on 2017/7/26 0026.
  */
-public class CommonsLogWriter  extends Writer {
+public class CommonsLogWriter  extends Writer{
     private final Log logger;
     private final StringBuilder buffer = new StringBuilder();
 
@@ -15,7 +15,7 @@ public class CommonsLogWriter  extends Writer {
     	Assert.notNull(logger,"Logger must notbe null");
     	this.logger = logger;
     }
-
+    
     public void write(char ch){
     	if(ch == '\n' && this.buffer.length()> 0){
     		this.logger.debug(this.buffer.toString());
@@ -25,7 +25,7 @@ public class CommonsLogWriter  extends Writer {
     		this.buffer.append(ch);
     	}
     }
-
+    
     public void write(char[] buffer,int offset,int length){
     	for(int i = 0;i < length; i++){
     		char ch = buffer[offset + i];
@@ -38,14 +38,14 @@ public class CommonsLogWriter  extends Writer {
     		}
     	}
     }
-
+    
     public void flush(){
-
+    	
     }
-
+    
     public void close(){
-
+    	
     }
-
+    
 
 }
