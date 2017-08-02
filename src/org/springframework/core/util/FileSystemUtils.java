@@ -3,8 +3,6 @@ package org.springframework.core.util;
 import java.io.File;
 import java.io.IOException;
 
-import org.springframework.util.FileCopyUtils;
-
 public abstract class FileSystemUtils {
 
 	public static boolean deleteRecursively(File root){
@@ -48,10 +46,6 @@ public abstract class FileSystemUtils {
 				ioex.initCause(ex);
 				throw ioex;
 			}
-			FileCopyUtils.copy(src, dest);
-		}
-		else{
-			
 		}
 	}
 	
