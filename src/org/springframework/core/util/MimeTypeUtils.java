@@ -4,9 +4,7 @@ import org.springframework.util.MimeType.SpecificityComparator;
 import org.springframework.util.StringUtils;
 
 import java.nio.charset.UnsupportedCharsetException;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by Administrator on 2017/8/3 0003.
@@ -94,6 +92,43 @@ public class MimeTypeUtils {
                     }
                 }
             }
+        }
+    }
+
+    public static List<MimeType> parseMimeTypes(String mimeTypes){
+        if(!StringUtils.hasLength(mimeTypes)){
+            return Collections.emptyList();
+        }else{
+            String [] tokens = mimeTypes.split(",\\s*");
+            List<MimeType> result = new ArrayList(tokens.length);
+            String [] var3 = tokens;
+            int var4 = tokens.length;
+
+            for(int var5 = 0;var5 < var4;++var5){
+                String token = var3[var5];
+                result.add(parseMimeType(token));
+            }
+            return result;
+        }
+    }
+    public static String toString(Collection<? extends MimeType>mimeTypes){
+        StringBuilder builder = new StringBuilder();
+        Iterator iterator = mimeTypes.iterator();
+
+        while(iterator.hasNext()){
+            MimeType mimeType = (MimeType)iterator.next();
+            mimeType.appendTo(builder);
+            if(iterator.hasNext()){
+                builder.append(", ");
+            }
+        }
+        return builder.toString();
+    }
+
+    public static void sortBySpecificity(List<MimeType>mimeTypes){
+        Assert.notNull(mimeTypes,"'mimeTypes' must not be null");
+        if(mimeTypes.size() > 1){
+            Collections.sort(mimeTypes,SPECIFICITY_COMPARATOR);
         }
     }
 }
