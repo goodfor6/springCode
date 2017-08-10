@@ -130,7 +130,7 @@ public class CachedIntrospectionResults {
       return (pd==null||pd instanceof GenericTypeAwarePropertyDescriptor ? pd:buildGenericTypeAwarePropertyDescriptor(getBeanClass(), pd));
    }
    
-   PropertyDescriptor[] getPropertyDescriptors(){
+   public PropertyDescriptor[] getPropertyDescriptors(){
 	   PropertyDescriptor[]pds=new PropertyDescriptor[this.propertyDescriptorCache.size()];
 	   int i=0;
 	   for(PropertyDescriptor pd:this.propertyDescriptorCache.values()){
