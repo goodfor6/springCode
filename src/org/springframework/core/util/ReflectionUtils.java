@@ -142,6 +142,18 @@ public abstract class ReflectionUtils {
 		}
 		throw new UndeclaredThrowableException(ex);
 	}
-	
+
+	public static void rethrowException(Throwable ex) throws Exception{
+		if(ex instanceof Exception){
+			throw (Exception)ex;
+		}
+		else if(ex instanceof Error){
+			throw (Error)ex;
+		}
+		else {
+			throw new UndeclaredThrowableException(ex);
+		}
+	}
+
 	
 }
