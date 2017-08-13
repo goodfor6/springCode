@@ -3,6 +3,7 @@ package org.springframework.core.util;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -155,5 +156,70 @@ public abstract class ReflectionUtils {
 		}
 	}
 
+	public static boolean declaresException(Method method, Class<?>exceptionType){
+		Assert.notNull(method, "Method must not be null");
+		Class<?>[] declaredExceptions = method.getExceptionTypes();
+		for(Class<?>declaredException : declaredExceptions){
+			if(declaredException.isAssignableFrom(exceptionType)){
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public static boolean isPublicStaticFinal(Field field){
+		int modifiers = field.getModifiers();
+		return (Modifier.isPublic(modifiers) && Modifier.isStatic(modifiers) && Modifier.isFinal(modifiers));
+	}
+	
+	public static boolean isEqualsMethod(Method method){
+		if(method == null || !method.getName().equals("equals")){
+			return false;
+		}
+		Class<?>[] paramTypes = method.getParameterTypes();
+		return (paramTypes.length == 1 && paramTypes[0] == Object.class);
+	}
+	
+	public static boolean isHashCodeMethod(Method method){
+		return (method != null && method.getName().equals("hashCode") && method.getParameterTypes().length == 0);
+	}
+	
+	public static boolean isToStringMethod(Method method){
+		return (method != null && method.getName().equals("toString") && method.getParameterTypes().length == 0);
+	}
+	
+	public static boolean isObjectMethod(Method method){
+		if(method == null){
+			return false;
+		}
+		try{
+			Object.class.getDeclaredMethod(method.getName(),method.getParameterTypes());
+			return true;
+		}
+		catch(Exception ex){
+			return false;
+		}
+	}
+	
+	public static boolean isCglibRenamedMethod(Method renamedMethod){
+		String name = renamedMethod.getName();
+		if(name.startsWith(CGLIB_RENAMED_METHOD_PREFIX)){
+			int i = name.length() - 1;
+			while(i >= 0 && Character.isDigit(name.charAt(i))){
+				i--;
+			}
+			return ((i > CGLIB_RENAMED_METHOD_PREFIX.length())&&
+					(i < name.length() - 1) &&
+					(name.charAt(i) == '$'));
+		}
+		return false;
+	}
+	
+	public static void makeAccessible(Field field){
+		if((!Modifier.isPublic(field.getModifiers()) || !Modifier.isPublic(field.getDeclaringClass().getModifiers()) ||
+				Modifier.isFinal(field.getModifiers())) && !field.isAccessible()){
+			field.setAccessible(true);
+		}
+	}
 	
 }
