@@ -1,10 +1,6 @@
 package org.springframework.core.util;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.UndeclaredThrowableException;
+import java.lang.reflect.*;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Map;
@@ -219,6 +215,48 @@ public abstract class ReflectionUtils {
 		if((!Modifier.isPublic(field.getModifiers()) || !Modifier.isPublic(field.getDeclaringClass().getModifiers()) ||
 				Modifier.isFinal(field.getModifiers())) && !field.isAccessible()){
 			field.setAccessible(true);
+		}
+	}
+
+	public static void makeAccessible(Method method){
+		if((!Modifier.isPublic(method.getModifiers()) || !Modifier.isPublic(method.getDeclaringClass().getModifiers())) && !method.isAccessible()){
+			method.setAccessible(true);
+		}
+	}
+
+	public static void makeAccessible(Constructor<?> ctor){
+		if((!Modifier.isPublic(ctor.getModifiers()) || !Modifier.isPublic(ctor.getDeclaringClass().getModifiers())) && !ctor.isAccessible()){
+			ctor.setAccessible(true);
+		}
+	}
+
+	public static void doWithMethods(Class<?>clazz,ReflectionUtils.MethodCallback mc)throws IllegalArgumentException{
+		doWithMethods(clazz,mc,(ReflectionUtils.MethodFilter)null);
+	}
+
+	public static void doWithMethods(Class<?> clazz, ReflectionUtils.MethodCallback mc, ReflectionUtils.MethodFilter mf)throws IllegalArgumentException{
+		Method[] methods = getDeclarecMethods(clazz);
+		Method[] var4 = methods;
+		int var5 = methods.length;
+
+		int var6;
+		for(var6 = 0; var6 < var5; ++var6){
+			Method method = var4[var6];
+			if(mf == null || mf.matches(method)){
+				try{
+					mc.doWith(method);
+				}
+				catch(IllegalAccessException var9){
+					throw new IllegalStateException("Shouldn't be illegal to access method'" +method.getName()+"':'"+var9);
+				}
+			}
+		}
+
+		if(clazz.getSuperclass() != null){
+			doWithMethods(clazz.getSuperclass(),mc,mf);
+		}
+		else if(clazz.isInterface()){
+			
 		}
 	}
 	
