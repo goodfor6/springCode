@@ -1,9 +1,20 @@
 package org.springframework.core.util;
 
-import java.lang.reflect.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+
+import org.springframework.util.ReflectionUtils.FieldCallback;
+import org.springframework.util.ReflectionUtils.FieldFilter;
+import org.springframework.util.ReflectionUtils.MethodCallback;
 
 public abstract class ReflectionUtils {
 	
@@ -59,7 +70,7 @@ public abstract class ReflectionUtils {
 		return findMethod(clazz ,name,new Class<?>[0] );
 	}
 	
-	public static Method findMethod(Class<?>clazz,String name,Class<?>... paramTypes){
+	public static Method findMethod(Class<?>clazz,String name,Class<?>...paramTypes){
 		Assert.notNull(clazz,"Class must not be null");
 		Assert.notNull(name,"Method name must not be null");
 		Class<?> searchType = clazz;
@@ -71,8 +82,9 @@ public abstract class ReflectionUtils {
 					return method;
 				}
 			}
-			return null;
+			searchType = searchType.getSuperclass();
 		}
+		return null;
 	}
 	
 
@@ -85,7 +97,7 @@ public abstract class ReflectionUtils {
 			return method.invoke(target, args);
 		}
 		catch(Exception ex){
-			handleReflectionExcption(ex);
+			handleReflectionException(ex);
 		}
 		throw new IllegalStateException("Should never get here");
 	}
@@ -118,7 +130,7 @@ public abstract class ReflectionUtils {
 			throw new IllegalStateException("Could not access method "+ ex.getMessage());
 		}
 		if(ex instanceof InvocationTargetException){
-			handleInvovationTargetException((InvocationTargetException)ex);
+			handleInvocationTargetException((InvocationTargetException)ex);
 		}
 		if(ex instanceof RuntimeException){
 			throw (RuntimeException)ex;
@@ -235,7 +247,7 @@ public abstract class ReflectionUtils {
 	}
 
 	public static void doWithMethods(Class<?> clazz, ReflectionUtils.MethodCallback mc, ReflectionUtils.MethodFilter mf)throws IllegalArgumentException{
-		Method[] methods = getDeclarecMethods(clazz);
+		Method[] methods = getDeclaredMethods(clazz);
 		Method[] var4 = methods;
 		int var5 = methods.length;
 
@@ -256,8 +268,132 @@ public abstract class ReflectionUtils {
 			doWithMethods(clazz.getSuperclass(),mc,mf);
 		}
 		else if(clazz.isInterface()){
-			
+			for(Class<?> superIfc : clazz.getInterfaces()){
+				doWithMethods(superIfc,mc,mf);
+			}
 		}
 	}
 	
+	public static Method[] getAllDeclaredMethods(Class<?>leafClass)throws IllegalArgumentException{
+		final List<Method> methods = new ArrayList<Method>(32);
+		doWithMethods(leafClass,new MethodCallback(){
+			public void doWith(Method method){
+				methods.add(method);
+			}
+		});
+		return methods.toArray(new Method[methods.size()]);
+	}
+	
+	public static Method[] getUniqueDeclaredMethods(Class<?> leafClass)throws IllegalArgumentException{
+		final List<Method>methods = new ArrayList<Method>(32);
+		doWithMethods(leafClass,new MethodCallback(){
+			public void doWith(Method method){
+				boolean knownSignature = false;
+				Method methodBeingOverriddenWithCovariantReturnType = null;
+				for(Method existingMethod : methods){
+					if(method.getName().equals(existingMethod.getName()) &&
+							Arrays.equals(method.getParameterTypes(), existingMethod.getParameterTypes())){
+						if(existingMethod.getReturnType() != method.getReturnType() &&
+								existingMethod.getReturnType().isAssignableFrom(method.getReturnType())){
+							methodBeingOverriddenWithCovariantReturnType = existingMethod;
+						}
+						else{
+							knownSignature = true;
+						}
+						break;
+					}
+				}
+				if(methodBeingOverriddenWithCovariantReturnType != null){
+					methods.remove(methodBeingOverriddenWithCovariantReturnType);
+				}
+				if(!knownSignature && isCglibRenamedMethod(method)){
+					methods.add(method);
+				}
+			}
+		});
+		return methods.toArray(new Method[methods.size()]);
+	}
+	
+	private static Method[] getDeclaredMethods(Class<?> clazz){
+		Method[] result = declaredMethodsCache.get(clazz);
+		if(result == null){
+			result = clazz.getDeclaredMethods();
+			declaredMethodsCache.put(clazz, result);
+		}
+		return result;
+	}
+	
+	public static void doWithFields(Class<?>clazz, FieldCallback fc)throws IllegalArgumentException{
+		doWithFields(clazz,fc,null);
+	}
+	
+	public static void doWithFields(Class<?>clazz, FieldCallback fc, FieldFilter ff) throws IllegalArgumentException{
+		Class<?> targetClass = clazz;
+		do{
+			Field[] fields = targetClass.getDeclaredFields();
+			for(Field field : fields){
+				if(ff != null && !ff.matches(field)){
+					continue;
+				}
+				try{
+					fc.doWith(field);
+				}
+				catch(IllegalAccessException ex){
+					throw new IllegalStateException("Shouldn't be illegal to access field '"+field.getName()+"':"+ex);
+				}
+			}
+			targetClass = targetClass.getSuperclass();
+		}
+		while (targetClass != null && targetClass != Object.class);
+	}
+	
+	public static void shallowCopyFieldState(final Object src, final Object dest) throws IllegalArgumentException{
+		if(src == null){
+			throw new IllegalArgumentException("Source for field copy cannot be null");
+		}
+		if(dest == null){
+			throw new IllegalArgumentException("Destination for filed copy cannot be null");
+		}
+		if(!src.getClass().isAssignableFrom(dest.getClass())){
+			throw new IllegalArgumentException("Destination class["+dest.getClass().getName()+
+					"] must be same or subclass as source class ["+src.getClass().getName()+"]");
+		}
+		doWithFields(src.getClass(),new FieldCallback(){
+			public void doWith(Field field)throws IllegalArgumentException,IllegalAccessException{
+				makeAccessible(field);
+				Object srcValue = field.get(src);
+				field.set(dest,srcValue);
+			}
+		},COPYABLE_FIELDS);
+	}
+	
+	public interface MethodCallback{
+		void doWith(Method method)throws IllegalArgumentException,IllegalAccessException;
+	}
+	
+	public interface MethodFilter{
+		boolean matches(Method method);
+	}
+	
+	public interface FieldCallback{
+		void doWith(Field field) throws IllegalArgumentException,IllegalAccessException;
+	}
+	
+	public interface FieldFilter{
+		boolean matches(Field field);
+	}
+	
+	public static FieldFilter COPYABLE_FIELDS = new FieldFilter(){
+		@Override
+		public boolean matches(Field field){
+			return !(Modifier.isStatic(field.getModifiers()) || Modifier.isFinal(field.getModifiers()));
+		}
+	};
+	
+	public static MethodFilter USER_DECLARED_METHODS = new MethodFilter(){
+		@Override
+		public boolean matches(Method method){
+			return (!method.isBridge() && method.getDeclaringClass() != Object.class);
+		}
+	};
 }
