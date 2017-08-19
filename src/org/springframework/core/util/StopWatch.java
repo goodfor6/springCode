@@ -2,6 +2,7 @@ package org.springframework.core.util;
 
 import java.text.NumberFormat;
 import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Created by Administrator on 2017/8/16 0016.
@@ -9,7 +10,7 @@ import java.util.LinkedList;
 public class StopWatch {
     private final String id;
     private boolean keepTaskList = true;
-    private final List<StopWatch.TaskInfo>taskList = new LinkedList();
+    private final List<TaskInfo> taskList = new LinkedList();
     private long startTimeMillis;
     private boolean running;
     private String currentTaskName;
@@ -18,7 +19,7 @@ public class StopWatch {
     private long totalTimeMillis;
     public StopWatch(){this.id = "";}
     public StopWatch(String id){this.id = id;}
-    public void setKeepTaskList(boolean keepTaskList){thsi.keepTaskList = keepTaskList;}
+    public void setKeepTaskList(boolean keepTaskList){this.keepTaskList = keepTaskList;}
     public void start() throws IllegalStateException{this.start("");}
     public void start(String taskName)throws IllegalStateException{
         if(this.running){
@@ -61,14 +62,6 @@ public class StopWatch {
         }
     }
 
-    public String getLastTaskName()throws IllegalStateException{
-        if(this.lastTaskInfo == null){
-            throw new IllegalStateException("No tasks run :can't get last task name");
-        }
-        else{
-            return this.lastTaskInfo.getTaskName();
-        }
-    }
 
     public String getLastTaskName()throws IllegalStateException{
         if(this.lastTaskInfo == null){
