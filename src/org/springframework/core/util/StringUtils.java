@@ -3,6 +3,8 @@ package org.springframework.core.util;
 import java.lang.reflect.Array;
 import java.util.*;
 
+import com.sun.corba.se.spi.orbutil.fsm.Guard.Result;
+
 /**
  * Created by Administrator on 2017/8/17 0017.
  */
@@ -367,12 +369,12 @@ public abstract class StringUtils {
                 prefix = prefix + "/";
                 pathToUse = pathToUse.substring(1);
             }
-            String pathArray = delimiterdListToStringArray(pathToUse,"/");
+            String[] pathArray = delimitedListToStringArray(pathToUse,"/");
             List<String> pathElements = new LinkedList();
             int tops = 0;
 
             int i= 0;
-            for(i = pathArray.length()-1;i >= 0;--i){
+            for(i = pathArray.length -1;i >= 0;--i){
                 String element = pathArray[i];
                 if(!".".equals(element)){
                     if("..".equals(element)){
@@ -395,8 +397,8 @@ public abstract class StringUtils {
 
     public static boolean pathEquals(String path1,String path2){return cleanPath(path1).equals(cleanPath(path2));}
 
-    public static Locale pareLocaleString(String localeString){
-        String[] parts = takenizeToStringArray(localeString,"_",false,false);
+    public static Locale parseLocaleString(String localeString){
+        String[] parts = tokenizeToStringArray(localeString,"_",false,false);
         String language = parts.length > 0 ? parts[0]:"";
         String country = parts.length > 1 ? parts[1]:"";
         validateLocalePart(language);
@@ -496,7 +498,7 @@ public abstract class StringUtils {
     }
 
     public static String[] toStringArray(Collection<String>collection){
-        return collection = null ? null: (String[])collection.toArray(new String[collection.size()]);
+        return collection == null ? null: (String[])collection.toArray(new String[collection.size()]);
     }
 
     public static String[] toStringArray(Enumeration<String> enumeration){
@@ -557,9 +559,136 @@ public abstract class StringUtils {
         }
     }
 
-    public static Properties splitArrayElementIntoProperties(String[] array,String delimiter){
-        return splitArrayElementIntoProperties(array, delimiter,(String) null);
+    public static Properties splitArrayElementsIntoProperties(String[] array,String delimiter){
+        return splitArrayElementsIntoProperties(array, delimiter,(String) null);
     }
 
-    public static Properties splitArrayElementsIntoProperties(String[] array,String delimiter,String charsToDelete)
+	public static Properties splitArrayElementsIntoProperties(String[] array, String delimiter, String charsToDelete) {
+
+		if (ObjectUtils.isEmpty(array)) {
+			return null;
+		}
+		Properties result = new Properties();
+		for (String element : array) {
+			if (charsToDelete != null) {
+				element = deleteAny(element, charsToDelete);
+			}
+			String[] splittedElement = split(element, delimiter);
+			if (splittedElement == null) {
+				continue;
+			}
+			result.setProperty(splittedElement[0].trim(), splittedElement[1].trim());
+		}
+		return result;
+	}
+	
+	public static String[] tokenizeToStringArray(String str,String delimiters){
+		return tokenizeToStringArray(str,delimiters,true,true);
+	}
+	
+	public static String[] tokenizeToStringArray(String str,String delimiters,boolean trimTokens,boolean ignoreEmptyTokens){
+		if(str == null){
+			return null;
+		}
+		StringTokenizer st = new StringTokenizer(str,delimiters);
+		List<String> tokens = new ArrayList<String>();
+		while(st.hasMoreTokens()){
+			String token = st.nextToken();
+			if(trimTokens){
+				token = token.trim();
+			}
+			if(!ignoreEmptyTokens || token.length() > 0){
+				tokens.add(token);
+			}
+		}
+		return toStringArray(tokens);
+	}
+	
+	public static String[]delimitedListToStringArray(String str, String delimiter){
+		return delimitedListToStringArray(str,delimiter,null);
+	}
+	
+	public static String[] delimitedListToStringArray(String str,String delimiter,String charsToDelete){
+		if(str == null){
+			return new String[0];
+		}
+		if(delimiter == null){
+			return new String[]{str};
+		}
+		List<String> result = new ArrayList<String>();
+		if("".equals(delimiter)){
+			for(int i = 0; i < str.length(); i++){
+				result.add(deleteAny(str.substring(i, i + 1), charsToDelete));
+			}
+		}
+		else{
+			int pos = 0;
+			int delPos;
+			while((delPos = str.indexOf(delimiter,pos)) != -1){
+				result.add(deleteAny(str.substring(pos,delPos),charsToDelete));
+				pos = delPos + delimiter.length();
+			}
+			if(str.length() > 0 && pos <= str.length()){
+				result.add(deleteAny(str.substring(pos),charsToDelete));
+			}
+		}
+		return toStringArray(result);
+	}
+	
+	public static String[]commaDelimitedListToStringArray(String str){
+		return delimitedListToStringArray(str,",");
+	}
+	
+	public static Set<String> commaDelimitedListToSet(String str) {
+		Set<String> set = new TreeSet<String>();
+		String[] tokens = commaDelimitedListToStringArray(str);
+		for (String token : tokens) {
+			set.add(token);
+		}
+		return set;
+	}
+	
+	public static String collectionToDelimitedString(Collection<?>coll,String delim,String prefix,String suffix){
+		if(CollectionUtils.isEmpty(coll)){
+			return "";
+		}
+		StringBuilder sb = new StringBuilder();
+		Iterator<?> it = coll.iterator();
+		while(it.hasNext()){
+			sb.append(prefix).append(it.next()).append(suffix);
+			if(it.hasNext()){
+				sb.append(delim);
+			}
+		}
+		return sb.toString();
+	}
+	
+	public static String collectionToDelimitedString(Collection<?> coll, String delim){
+		return collectionToDelimitedString(coll,delim,"","");
+	}
+	
+	public static String collectionToCommaDelimitedString(Collection<?>coll){
+		return collectionToDelimitedString(coll,",");
+	}
+	
+	public static String arrayToDelimitedString(Object[] arr,String delim){
+		if(ObjectUtils.isEmpty(arr)){
+			return "";
+		}
+		if(arr.length == 1){
+			return ObjectUtils.nullSafeToString(arr[0]);
+		}
+		StringBuilder sb = new StringBuilder();
+		for(int i =0; i < arr.length; i++){
+			if(i > 0){
+				sb.append(delim);
+			}
+			sb.append(arr[i]);
+		}
+		return sb.toString();
+	}
+	
+	public static String arayToCommaDlimitedString(Object[] arr){
+		return arrayToDelimitedString(arr,",");
+	}
 }
