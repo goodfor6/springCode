@@ -22,7 +22,7 @@ abstract class AbstractStaxXMLReader extends AbstractXMLReader {
     private static boolean namespacesFeature = true;
     private static boolean namespacePrefixesFeature = false;
     private Boolean isStandalone;
-    private final Map<String, String> namespaces = new LinkedHashMap();
+    private final Map<String, String> namespaces = new LinkedHashMap( );
 
     AbstractStaxXMLReader(){}
 
