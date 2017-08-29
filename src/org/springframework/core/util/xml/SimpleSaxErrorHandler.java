@@ -1,3 +1,4 @@
+
 package org.springframework.core.util.xml;
 
 import org.apache.commons.logging.Log;
@@ -24,3 +25,5 @@ public class SimpleSaxErrorHandler implements ErrorHandler {
 		throw ex;
 	}
 }
+
+

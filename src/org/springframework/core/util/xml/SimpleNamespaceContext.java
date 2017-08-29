@@ -1,3 +1,4 @@
+
 package org.springframework.core.util.xml;
 
 import java.util.ArrayList;
@@ -104,6 +105,9 @@ public class SimpleNamespaceContext implements NamespaceContext{
 	}
 	
 }
+
+
+
 
 
 
