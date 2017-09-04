@@ -130,4 +130,8 @@ abstract class AbstractStaxXMLReader extends AbstractXMLReader {
 
     }
 
+    protected boolean hasNamespacesFeature() {
+        return this.namespacesFeature;
+    }
+
 }
