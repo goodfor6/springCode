@@ -55,6 +55,16 @@ public class XMLEventStreamWriter implements XMLStreamWriter {
         this.eventWriter.setDefaultNamespace(uri);
     }
 
+    @Override
+    public void setNamespaceContext(NamespaceContext context) throws XMLStreamException {
+
+    }
+
+    @Override
+    public NamespaceContext getNamespaceContext() {
+        return null;
+    }
+
     public Object getProperty(String name)throws IllegalArgumentException{
         throw new IllegalArgumentException();
     }
@@ -70,17 +80,17 @@ public class XMLEventStreamWriter implements XMLStreamWriter {
     }
 
     public void writeStartDocument(String encoding,String version)throws XMLStreamException{
-        closeEmptyElmentIfNecessary();
+        closeEmptyElementIfNecessary();
         this.eventWriter.add(this.eventFactory.createStartDocument(encoding,version));
     }
 
     public void writeStartElement(String localName)throws XMLStreamException{
-        closeEmptyElementIfNecessay();
+        closeEmptyElementIfNecessary();
         doWriteStartElement(this.eventFactory.createStartElement(new QName(localName),null,null));
     }
 
     public void writeStartElement(String namespaceURI,String localName)throws XMLStreamException{
-        closeEmptyElementIfNecessay();
+        closeEmptyElementIfNecessary();
         doWriteStartElement(this.eventFactory.createStartElement(new QName(namespaceURI,localName),null,null));
     }
 
@@ -101,7 +111,7 @@ public class XMLEventStreamWriter implements XMLStreamWriter {
     }
 
     public void writeEmptyElement(String namespaceURI,String localName)throws XMLStreamException{
-        closeEmptyElementIfNecessay();
+        closeEmptyElementIfNecessary();
         writeStartElement(namespaceURI,localName);
         this.emptyElement = true;
     }
@@ -110,6 +120,11 @@ public class XMLEventStreamWriter implements XMLStreamWriter {
         closeEmptyElementIfNecessary();
         writeStartElement(prefix,localName,namespaceURI);
         this.emptyElement = true ;
+    }
+
+    @Override
+    public void writeEmptyElement(String localName) throws XMLStreamException {
+
     }
 
     private void closeEmptyElementIfNecessary() throws XMLStreamException{
@@ -147,7 +162,7 @@ public class XMLEventStreamWriter implements XMLStreamWriter {
         doWriteNamespace(this.eventFactory.createNamespace(namespaceURI));
     }
 
-    private void doWritenamespace(Namespace namespace) throws XMLStreamException{
+    private void doWriteNamespace(Namespace namespace) throws XMLStreamException{
         int last = this.endElements.size() - 1;
         EndElement oldEndElement = this.endElements.get(last);
         Iterator oldNamespaces = oldEndElement.getNamespaces();
