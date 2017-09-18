@@ -1,7 +1,7 @@
 package org.springframework.core.util.concurrent;
 
 import org.springframework.util.concurrent.*;
-import org.springframework.util.concurrent.ListenableFutureCallback;
+import org.springframework.core.util.concurrent.ListenableFutureCallback;
 
 import java.util.concurrent.*;
 
@@ -18,6 +18,11 @@ public class ListenableFutureTask<T> extends FutureTask<T> implements Listenable
 
     public void addCallback(ListenableFutureCallback<? super T> callback) {
         this.callbacks.addCallback(callback);
+    }
+
+    @Override
+    public void addCallback(org.springframework.util.concurrent.ListenableFutureCallback<? super T> callback) {
+
     }
 
     @Override
