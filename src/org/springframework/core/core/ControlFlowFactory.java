@@ -2,7 +2,6 @@ package org.springframework.core.core;
 
 import org.springframework.core.util.Assert;
 
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
