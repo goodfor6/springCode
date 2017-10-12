@@ -1,11 +1,17 @@
 package org.springframework.core.core;
 
 import org.springframework.core.util.Assert;
+import org.springframework.core.util.ClassUtils;
 import org.springframework.core.util.ConcurrentReferenceHashMap;
+import org.springframework.core.util.ObjectUtils;
 
 import java.io.Serializable;
+import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
+import java.util.Collection;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 /**
@@ -81,7 +87,110 @@ public final  class ResolvableType  implements Serializable {
         if(matchedBefore != null && matchedBefore.get(this.type) == other.type){
             return true;
         }
-        org.springframework.core.ResolvableType.WildcardBounds ourBounds = org.springframework.core.ResolvableType.WildcardBounds.get(this);
-        org.springframework.core.ResolvableType.WildcardBounds typeBounds = org.springframework.core.ResolvableType.WildcardBounds.get(other);
+        WildcardBounds ourBounds = WildcardBounds.get(this);
+        WildcardBounds typeBounds = WildcardBounds.get(other);
+
+        if(typeBounds != null){
+            return (ourBounds != null && ourBounds.isSameKind(typeBounds) && ourBounds.isAssignableForm(typeBounds.getBounds()));
+        }
+        if(ourBounds != null){
+            return ourBounds.isAssignableForm(other);
+        }
+
+        boolean exactMatch = (matchedBefore != null);
+        boolean checkedGenerics = true;
+        Class<?> ourResolved = null;
+        if(this.type instanceof TypeVariable){
+            TypeVariable<?> variable = (TypeVariable<?>)this.type;
+            if(this.variableResolver != null){
+                ResolvableType resolved = this.variableResolver.resolveVariable(variable);
+                if(resolved != null){
+                    ourResolved = resolved.resolve();
+                }
+            }
+            if(ourResolved == null){
+                if(other.variableResolver != null){
+                    ResolvableType resolved = other.variableResolver.resolveVariable(variable);
+                    if(resolved != null){
+                        ourResolved = resolved.resolve();
+                        checkGenerics = false;
+                    }
+                }
+            }
+            if(ourResolved == null){
+                exactMatch = false;
+            }
+        }
+        if(ourResolved == null){
+            ourResolved = resolve(Object.class);
+        }
+        Class<?> otherResolved = other.resolve(Object.class);
+
+        if(exactMatch ? !ourResolved.equals(otherResolved): !ClassUtils.isAssignable(ourResolved.otherResolved)){
+            return false;
+        }
+
+        if(checkGenerics){
+            ResolvableType[] ourGnerics = getGenerics();
+            ResolvableType[] typeGenerics = other.as(ourResolved).getGenerics();
+            if(ourGenerics.length != typeGenerics.length){
+                return false;
+            }
+            if(matchedBefor == null){
+                matchedBefore = new IdentityHashMap<Type,Type>(1);
+            }
+            matchedBefore.put(this.type,other.type);
+            for(int i = 0;i < ourGnerics.length;i++){
+                if(!ourGnerics[i].isAssignableFrom(typeGenerics[i],matchedBefore)){
+                    return false;
+                }
+            }
+        }
+        return true;
     }
+
+    public boolean isArray(){
+        if(this == NONE){
+            return false;
+        }
+        return (((this.type instanceof  Class && ((Class<?>)this.type).isArray())) || this.type instanceof GenericArrayType || resolveType().isArray));
+    }
+
+
+    public ResolvableType getComponentType(){
+        if(this == NONE){
+            return NONE;
+        }
+        if(this.componentType != null){
+            return this.componentType;
+        }
+        if(this.type instanceof  Class){
+            Class<?> componentType = ((Class<?>)this.type).getComponentType();
+            return ForType(componentType, this.variableResolver);
+        }
+        if(this.type instanceof  GenericArrayType){
+            return forType(((GenericArrayType)this.type).getGenericComponentType(),this.variableResolver);
+        }
+        return resolveType().getComponentType();
+    }
+
+    public ResolvableType asCollection(){return as(Collection.class);}
+
+    public ResolvableType asMap(){return asMap(Map.class);}
+
+    public ResolvableType as(Class<?> type){
+        if(this == NONE){
+            return NONE;
+        }
+        if(ObjectUtils.nullSafeEquals(resolve(),type)){ return this;}
+
+        for(ResolvableType interfaceType : getInterfaces()){
+            ResolvableType interfaceAsType = interfaceType.as(type);
+            if(interfaceAsType != NONE){
+                return interfaceAsType;
+            }
+        }
+        return getSuperType().as(type);
+    }
+
 }
